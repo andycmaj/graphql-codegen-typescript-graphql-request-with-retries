@@ -36,3 +36,38 @@ const sdk = getSdk(client, withRetries);
 
 export default sdk;
 ```
+
+# Unit test
+
+```typescript
+import nock from 'nock';
+import graphqlClient from 'shared/graphqlClient';
+
+describe('graphqlClient', () => {
+  beforeAll(() => nock.disableNetConnect());
+  afterAll(() => nock.enableNetConnect());
+  afterEach(() => nock.cleanAll());
+
+  it('retries twice when ETIMEDOUT', async () => {
+    nock(/localhost|botany-db/)
+      .post('/v1/graphql')
+      .replyWithError({ code: 'ETIMEDOUT', message: 'connect ETIMEDOUT' });
+
+    nock(/localhost|botany-db/)
+      .post('/v1/graphql')
+      .replyWithError({ code: 'ETIMEDOUT', message: 'connect ETIMEDOUT' });
+
+    nock(/localhost|botany-db/)
+      .post('/v1/graphql')
+      .replyWithError({ code: 'ETIMEDOUT', message: 'connect ETIMEDOUT' });
+
+    try {
+      await graphqlClient.GetDataSource({
+        dataSourceId: 'github',
+      });
+    } catch (e) {
+      console.log('LAST ERROR', e, e.stack);
+    }
+  });
+});
+```
