@@ -104,7 +104,7 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
           }: ${o.operationVariablesTypes}): Promise<${o.operationResultType}> {
   return withWrapper(() => client.request<${
     o.operationResultType
-  }>(${doc}, variables), ${o.node.name.value});
+  }>(${doc}, variables), '${o.node.name.value}');
 }`;
         }
       })
