@@ -7,14 +7,17 @@ import {
   DocumentMode,
 } from '@graphql-codegen/visitor-plugin-common';
 import autoBind from 'auto-bind';
-import { GraphQLSchema, Kind } from 'graphql';
-import { OperationDefinitionNode } from 'graphql';
+import { GraphQLSchema, Kind, OperationDefinitionNode } from 'graphql';
+
 import { RawGraphQLRequestPluginConfig } from './config';
 
 export interface GraphQLRequestPluginConfig extends ClientSideBasePluginConfig {
   rawRequest: boolean;
-  retryPolicy: boolean;
 }
+
+const additionalExportedTypes = `
+export type SdkFunctionWrapper = <T>(action: () => Promise<T>, operationName: string) => Promise<T>;
+`;
 
 export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
   RawGraphQLRequestPluginConfig,
@@ -35,7 +38,6 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
   ) {
     super(schema, fragments, rawConfig, {
       rawRequest: getConfigValue(rawConfig.rawRequest, false),
-      retryPolicy: getConfigValue(rawConfig.retryPolicy, false),
     });
 
     autoBind(this);
@@ -51,13 +53,6 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
     if (this.config.rawRequest) {
       this._additionalImports.push(
         `import { GraphQLError } from 'graphql-request/dist/src/types';`
-      );
-    }
-
-    if (this.config.retryPolicy) {
-      // TODO: default config now, configurable policy later
-      this._additionalImports.push(
-        `import { RetryWrapper } from 'typescript-graphql-request-with-retries';`
       );
     }
   }
@@ -99,25 +94,26 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
           }: ${o.operationVariablesTypes}): Promise<{ data?: ${
             o.operationResultType
           } | undefined; extensions?: any; headers: Headers; status: number; errors?: GraphQLError[] | undefined; }> {
-                      return client.rawRequest<${
-                        o.operationResultType
-                      }>(${doc}, variables);
-                  }`;
+    return withWrapper(() => client.rawRequest<${
+      o.operationResultType
+    }>(${doc}, variables));
+}`;
         } else {
-          return `
-          ${o.node.name.value}(variables${optionalVariables ? '?' : ''}: ${
-            o.operationVariablesTypes
-          }): Promise<${o.operationResultType}> {
-            return withRetries(() => client.request<${
-              o.operationResultType
-            }>(${doc}, variables));
-          }
-`;
+          return `${o.node.name.value}(variables${
+            optionalVariables ? '?' : ''
+          }: ${o.operationVariablesTypes}): Promise<${o.operationResultType}> {
+  return withWrapper(() => client.request<${
+    o.operationResultType
+  }>(${doc}, variables), o.node.name.value);
+}`;
         }
       })
       .map(s => indentMultiline(s, 2));
 
-    return `export function getSdk(client: GraphQLClient, withRetries: RetryWrapper) {
+    return `${additionalExportedTypes}
+
+const defaultWrapper: SdkFunctionWrapper = sdkFunction => sdkFunction();
+export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = defaultWrapper) {
   return {
 ${allPossibleActions.join(',\n')}
   };

@@ -18,8 +18,6 @@ import { GraphQLRequestVisitor } from './visitor';
 import { extname } from 'path';
 import { RawGraphQLRequestPluginConfig } from './config';
 
-export type RetryWrapper = <T>(action: () => Promise<T>) => Promise<T>;
-
 export const plugin: PluginFunction<RawGraphQLRequestPluginConfig> = (
   schema: GraphQLSchema,
   documents: Types.DocumentFile[],

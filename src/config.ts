@@ -3,5 +3,4 @@ import { RawClientSideBasePluginConfig } from '@graphql-codegen/visitor-plugin-c
 export interface RawGraphQLRequestPluginConfig
   extends RawClientSideBasePluginConfig {
   rawRequest?: boolean;
-  retryPolicy?: boolean;
 }
